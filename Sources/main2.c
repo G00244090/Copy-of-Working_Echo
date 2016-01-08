@@ -1,21 +1,3 @@
-/*
- * main2.c
- *
- *  Created on: 29 Dec 2015
- *      Author: Aonghus
- */
-
-
-
-
-/*
- *  Uses UART0 in interrupt mode to echo receive characters
- *
- *  Niall O'Keeffe
- *  V01
- *  11/11/15
- */
-
 #include "board.h"
 #include "fsl_clock_manager.h"
 #include "fsl_debug_console.h"
@@ -30,6 +12,7 @@
  ******************************************************************************/
 char char_received();
 void enable_UART0_receive_interrupt();
+char c;
 /*******************************************************************************
  * Code
  ******************************************************************************/
@@ -40,18 +23,19 @@ void enable_UART0_receive_interrupt();
  */
 void UART0_IRQHandler(void)
 {
-	PRINTF("Echo:");
+	//PRINTF("Echo:");
     if(UART0_S1 & RDRF_MASK)
-    	//PUTCHAR(UART0_D);
-    	put_char(UART0_D);
+    {
+    	c = UART0_D;
+    	PUTCHAR(c);
+
+
+    PRINTF("My CHARACTER ENTERED IS : %c \r\n",c);
+    if(strcmp(c,'D') == 0)
+    PRINTF("hello Aonghus \r\n");
+    }
 }
 
-void put_char(char c)
-{
-while((UART0_S1 & TDRE_MASK) == 0) //wait until tx buffer is empty
-{}
-UART0_D = c;
-}
 
 int main()
 {
@@ -69,12 +53,16 @@ char char_received()
 {
 	if(UART0_S1 & RDRF_MASK)
 	{
-		if((char *)UART0_D == 'A')
-			PRINTF("hello Aonghus");
+
+
+
 		return 1;
+
 	}
 	else
+		{
 		return 0;
+		}
 }
 
 
