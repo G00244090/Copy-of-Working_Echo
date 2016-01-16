@@ -86,7 +86,7 @@
     #define BOARD_DEBUG_UART_BASEADDR   UART0
 #endif
 #ifndef BOARD_DEBUG_UART_BAUD
-    #define BOARD_DEBUG_UART_BAUD       115200
+    #define BOARD_DEBUG_UART_BAUD       9600
 #endif
 
 /* This define to use for power manager demo */

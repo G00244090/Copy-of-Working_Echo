@@ -14,7 +14,7 @@
 #define RDRF_MASK 0x20	//Receive Data Register Full Flag Mask
 #define RIE_MASK 0x20	//Receive Interrupt Enable Mask
 #define TDRE_MASK 0x80u
-#define BufferSize 80
+#define BufferSize 20
 //response codes for AT command function
 #define SUCCESS 0
 #define FAIL -1
@@ -47,19 +47,12 @@ void printf_response(char * ptr);
  */
 void UART0_IRQHandler(void)
 {
-
-	//PRINTF("Echo:");
+	PRINTF("Recived: %c %d %i %x\r\n",c);
     if(UART0_S1 & RDRF_MASK)
     {
-    	    	//PRINTF("%c",c);
-    	c = UART0_D;
-
-    	PRINTF("Recived: %c %d %i\r\n",&c);
-
-    	//PUTCHAR(c);
+    	UART0_D=c;
     	buffer_put(c);
     }
-    //PRINTF("\r\n");
 }
 void buffer_put(char data)
 {
@@ -134,7 +127,6 @@ void printf_response(char * ptr)
 }
 int send_command(char * command_ptr, char * response_ptr, int size, int wait_time)
 {
-	PRINTF("\r\nInside send command\r\n");
 	volatile int time = 0;
 	char CR_count=0;
 	int x, termination_char_received = 0, command_received=0;
@@ -147,17 +139,12 @@ int send_command(char * command_ptr, char * response_ptr, int size, int wait_tim
 		*temp_ptr++ = 0;
 	for(x=0;x<20;x++)
 		buff[x] = 0;
-	PRINTF("\r\nBuffers cleared, sending command \r\n");
 	//send command to serial port
 	while(*command_ptr != '\0')
 	{
 		PUTCHAR(*command_ptr++);
-		while((UART0_S1 & TDRE_MASK) == 0)//wait until tx buffer is empty
-		{}
-		UART0_D = *command_ptr++;
-
 	}
-	PRINTF("\r\nWaiting for a response command \r\n");
+	//PRINTF("\r\nWaiting\r\n");
 	//wait for a command response or a timeout
 	time = tick_count;
 	x=0;
@@ -167,18 +154,14 @@ int send_command(char * command_ptr, char * response_ptr, int size, int wait_tim
 		c = buffer_get();
 		if(c)	//buffer not empty
 		{
+			//PRINTF("%c",c);
 			*response_ptr++ = c;
 			rx_count++;
 			if(!termination_char_received)
 			{
-				if(strstr(response_ptr - rx_count, "Te") )
-				{
-
-					PRINTF("\nBloody Te again\n");
-				}
 				if(strstr(response_ptr - rx_count, "OK") || strstr(response_ptr - rx_count, "ERROR:")
 						|| strstr(response_ptr - rx_count, "READY") || strstr(response_ptr - rx_count, "SIM PIN")
-						|| strstr(response_ptr - rx_count, "+CREG") || strstr(response_ptr - rx_count, "Te") )
+						|| strstr(response_ptr - rx_count, "+CREG") )
 				{
 					PRINTF("\nOK or ERROR received\n");
 					termination_char_received = 1;
@@ -207,15 +190,6 @@ PRINTF("Got out of while !!!!!");
 	}
 
 }
-
-/*---------------------------------------------------------------------------
- * Function to send an SMS text message
- *
- * The function is passed 2 strings - the phone number and the text message
- * Text message must be terminated with Control Z (0x1A)
- * e.g. send_sms("\"+353876477260\"","\"this is a test\"");
- *
- */
 
 int send_sms(char * number, char * message)
 {
@@ -291,153 +265,46 @@ PIT_TFLG0 = 0x01ul; //Clear interrupt flag
 PIT_LDVAL0 = reload_value; //load time value
 PIT_TCTRL0 |= 0x03ul; //enable timer and interrupt
 }
-
 void PIT_IRQHandler()
 {
 	PIT_TFLG0 = 0x01ul;	//Clear interrupt flag
-	//Next step is needed because of a device error
-	//See e2682 in errata for mask 0M33Z
-	//Without this subsequent interrupts will not be generated
 	PIT_TCTRL0 |= 0x03ul;	//enable timer and interrupt
 	tick_count++;
-	//PRINTF("\r\nISR TICK COUNT %D",&tick_count);
 }
 
 int main()
 {
-
-	char * AT = "\r\nAT\r\n";//Setting up a char variable AT for the a long string
-	char * PIN_CHECK = "\r\nAT+CPIN?\r\n";//Setting up a char variable PIN_CHECK for the a long string
-	char * ENTER_PIN = "\r\nAT+CPIN=\"1234\"\r\n";//Setting up a char variable ENTER_PIN for the a long string
-	char * CREG = "\r\nAT+CREG?\r\n";//Setting up a char variable CREG for the a long string
+	char * AT = "AT\r\n";//Setting up a char variable AT for the a long string
 	char response[20]; //A character buffer called response that can hold 20 characters
 	int result = 0;	//int result to check the value of the response sent back
 	int transmit_send = 0;
 	volatile int CurrentTick;	//Volitile interger to hold the current tick count of the current time
 	char * ptr;	//Character
 	char * stat;
-	enum STATES {INIT, CHECK_PIN, SEND_PIN, CHECK_NETWORK_REG, SEND_SMS, CONNECTED};
+	enum STATES {INIT};
 	enum STATES CurrentState = INIT;
 	buffer_init();
 	hardware_init();
-	//UART0_config();
 	enable_UART0_receive_interrupt();
 	PIT_Configure_interrupt_mode(1);
-	//PRINTF("UART0 Test Code\n\r");
-	//PRINTF("Any entered character will be echoed\r\n\n");
 	while(1)
 	{
 		switch(CurrentState)
 		{
 		case INIT:	//Check connection to MODEM by sending AT. Expected response is OK
-			printf("Testing Modem Connection\n");
 			result = send_command(AT, response, sizeof(response), 2000);
 			if(result == SUCCESS || result == ERROR)
 			{
 				printf_response(response);
 			}
 			if(result == SUCCESS)	//"OK" was returned by MODEM
-				CurrentState = CHECK_PIN;
+				PRINTF("It Worked");
 			else	//incorrect response or timeout. Delay and try again
 			{
 				CurrentTick = tick_count;
 				while((tick_count - CurrentTick) < 5)
 				{}
 			}
-			break;
-
-		case CHECK_PIN:	//Check if SIM card is ready
-			result = send_command(PIN_CHECK, response, sizeof(response), 10);
-			if(result == SUCCESS || result == ERROR)
-			{
-				printf_response(response);
-			}
-			if(result == SUCCESS)	//"OK" returned, check response string for "READY" or "SIM_PIN"
-			{
-				if(strstr(response, "READY"))
-				{
-					CurrentState = CHECK_NETWORK_REG;
-				}
-				else if(strstr(response, "SIM PIN"))
-				{
-					CurrentState = SEND_PIN;
-				}
-			}
-			else
-				CurrentState = INIT;
-			break;
-
-		case SEND_PIN:	//Send PIN code. "OK" response if PIN is correct
-			result = send_command(ENTER_PIN, response, sizeof(response),10);
-			if(result == SUCCESS || result == ERROR)
-			{
-				printf_response(response);
-			}
-			if(result == SUCCESS)	//"OK" returned, check response string for "READY" or "SIM_PIN"
-			{
-				CurrentState = CHECK_NETWORK_REG;
-			}
-			else
-				CurrentState = INIT;
-			break;
-
-
-		case CHECK_NETWORK_REG:	//check if registered on mobile network
-			result = send_command(CREG, response, sizeof(response), 20);
-			if(strstr(response, "+CREG"))
-			{
-				stat = (char *)strstr(response,":");
-				stat += 4;
-				switch(*stat)
-				{
-				case '0':
-					CurrentState = INIT;
-					break;
-				case '1':
-					CurrentState = SEND_SMS;
-					break;
-				case '2':
-					CurrentTick = tick_count;
-					while((tick_count - CurrentTick) < 5)
-					{}
-					CurrentState = CHECK_NETWORK_REG;
-					break;
-				case '3':
-					CurrentState = INIT;
-					break;
-				case '4':
-					CurrentState = CONNECTED;
-					break;
-				case '5':
-					CurrentState = SEND_SMS;
-					break;
-
-				}
-			}
-
-
-		case SEND_SMS:	//Send a text message
-			transmit_send = send_sms("\"0877763894\"","\"Testing 123		\"");
-			if(transmit_send == SUCCESS)
-			{
-				CurrentState = CONNECTED;
-			}
-			else if(transmit_send == FAIL)
-			{
-				printf("A transmission fail has been detected or you have timed out\r\n");
-				CurrentState = SEND_SMS;
-			}
-			else if(transmit_send == ERROR)
-			{
-				printf("A transmission ERROR has been detected,rebooting\r\n");
-				CurrentState = INIT;
-			}
-			break;
-
-		case CONNECTED:
-			printf("\nInside Connected \r\n");
-			while(1)	//dummy loop
-			{}
 			break;
 
 		default:

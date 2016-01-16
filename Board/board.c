@@ -93,7 +93,7 @@ const clock_manager_user_config_t g_defaultClockConfigRun =
         .pllFllSel = kClockPllFllSelPll,    // PLLFLLSEL select PLL.
         .er32kSrc  = kClockEr32kSrcLpo,     // ERCLK32K selection, use LPO.
         .outdiv1   = 1U,
-        .outdiv4   = 3U,
+        .outdiv4   = 1U,//3U,
     },
     .oscerConfig =
     {
