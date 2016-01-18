@@ -585,7 +585,8 @@ int main(void)
 	uart_state_t uartState; // user provides memory for the driver state structure
 	uart_user_config_t uartConfig;
 	long int x;
-	char AT[] = "AT\n\r";
+
+	char AT[] = "\nAT";
 	uint32_t byteCountBuff = 0;
     //Initialise the FRDM-KL26Z Board
 	hardware_init();
